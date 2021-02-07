@@ -1,7 +1,12 @@
 import praw
 import collections
 import string
+import pretty_errors #do not delete
+import time
+from csv import reader
+from itertools import islice
 
+#--- Pre-Reqs ---#
 #panda
 import pandas as pd
 def print_full(x):
@@ -23,7 +28,7 @@ nltk.download('stopwords')
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
-#--- login ---#
+#login
 from login_creds import client_id
 from login_creds import client_secret
 from login_creds import username
@@ -38,90 +43,57 @@ reddit = praw.Reddit(
     password= password)  # your reddit password
 
 #--- Choose Function ---#
-def user_choice(): #As if you want to search by URL or word
-    choice = input(f'Welcome! How would you like to use the scraper?'
-          f'\n1) Submit URL'
-          f'\n2) Type subreddit and search term'
-          f'\n>>: ')
-    return user_chocie_method(choice)
-
-def user_chocie_method(choice):
-    if choice == '1':
-        url_method()
-
-    if choice == '2':
-        query_method()
-
-#--- URL Function ---#
-def url_method():
-    url = input('What is the URL?: ')
-    submission = reddit.submission(url=url)
-
-
-    #--- CSV Storage ---#
-    for item in url:
-        comments_dict = {
-            "comment_id": [],  # unique comm id
-            "comment_parent_id": [],  # comment parent id
-            "comment_body": [],  # text in comment
-            "comment_link_id": []  # link to the comment
-        }
-
-        pages = input(f"\nLet's set a limit on pages to scrape..."
-                      f'\nHow many pages should the program scrape before stopping? (Type "None" if you want every page)'
-                      f"\n>>: ")
-        if pages.isnumeric():
-            pages = int(pages)
-
+def user_choice():
+    message = ''
+    while message != 'quit':
+        choice = int(input(f'\nWelcome! Please choose a mode to use?'
+            f'\n1) Submit reddit post URL for csv output.'
+            f'\n2) Submit reddit post URL for streaming output.'     
+            f'\n3) Find post comments in a subreddit using a search term.'
+            f'\n99) Quit'
+            f'\n>>: '))
+        if choice == 1:
+            url = input('\nWhat is the URL of the Reddit thread?: ')
+            pages = input(f"\nLet's set a limit on pages to scrape..."
+                          f'\nHow many pages should the program scrape before stopping? (Type "None" if you want every page)'
+                          f"\n>>: ")
+            url_method(url, pages)
+        if choice == 2:
+            url = input('\nWhat is the URL of the Reddit thread?: ')
+            pages = input(f"\nLet's set a limit on pages to scrape..."
+                          f'\nHow many pages should the program scrape before stopping? (Type "None" if you want every page)'
+                          f"\n>>: ")
+            url_streaming(url, pages)
+        if choice == 3:
+            query_method()
         else:
-            pages = None
+            message = 'quit'
 
-        submission.comments.replace_more(limit=pages)
-        for comment in submission.comments.list():
-            comments_dict["comment_id"].append(comment.id)
-            comments_dict["comment_parent_id"].append(comment.parent_id)
-            comments_dict["comment_body"].append(comment.body)
-            comments_dict["comment_link_id"].append(comment.link_id)
+#--- URL to CSV Function ---#
+def url_method(url, pages):
+    reddit_to_csv(url, pages)
+    print("\n***--- DONE! Check the program's directory! ---***")
 
-        post_comments = pd.DataFrame(comments_dict)
-        post_comments.to_csv("RESULTS_Comments_from_URL.csv")
-        print("***CSV file created***")
-        print("***Counting Words please wait***")
+    time.sleep(1)
+    return
 
-        #--- Word Counter ---#
-        allcommentslist = (comments_dict.get('comment_body'))
-        allcomments = word_counter(allcommentslist) #Uses created word counter function
-        allcomments.to_csv("WORD_Count_RESULTS_from_URL.csv")
-        print("***done! Check the program's directory!***")
+#--- Streaming Function ---#
+def url_streaming(url, pages):
+    message = ''
+    while message != 'quit':
+        reddit_to_csv(url, pages)
+        try:
+            # iterate over each line as a ordered dictionary and print only few column by column name
+            with open('WORD_Count_RESULTS_from_URL.csv', 'r', encoding="utf8") as read_obj:
+                csv_reader = reader(read_obj)
+                for row in islice(csv_reader, 1, 51):
+                    print(f'Rank: {row[0]}      Word: {row[1]} : {row[2]}')
+                    time.sleep(1)
+            print('*** Recalculating... ***')
+        except KeyboardInterrupt:
+            break
 
-        #CL Print
-        print_full(allcomments)
-        break
-
-def word_counter(allcommentslist): #Next task is to add stopwords
-    allcommentsstr = ''.join(allcommentslist)
-    allcomments_split = allcommentsstr.split()
-
-    filtered_sentence = stopwordmachine(allcomments_split)
-    filtered_sentence_split = filtered_sentence.split()
-
-    allcomments_count = collections.Counter(filtered_sentence_split)
-    allcomments_count_sorted = allcomments_count.most_common()
-    allcomments = pd.DataFrame(allcomments_count_sorted)
-    return allcomments
-
-def stopwordmachine(allcomments_split):
-    all_stopwords = stopwords.words('english')
-    all_stopwords.append("’")
-
-    allcomments_split = str(allcomments_split)
-    allcomments_split = allcomments_split.lower()
-    allcomments_split_nopunc = allcomments_split.translate(str.maketrans('', '', string.punctuation))
-    text_tokens = word_tokenize(allcomments_split_nopunc)
-    tokens_without_sw = [word for word in text_tokens if not word in all_stopwords]
-    filtered_sentence = (" ").join(tokens_without_sw)
-    return(filtered_sentence)
-
+#--- Search Term Function ---#
 def query_method():
     sub_input = input(f'\nWhat is the name of the subreddit?'
                 f'\n>>: r/')
@@ -179,12 +151,71 @@ def query_method():
             allcommentslist = (comments_dict.get('comment_body'))
             allcomments = word_counter(allcommentslist)  # Uses created word counter function
             allcomments.to_csv("WORD_Count_RESULTS_from_URL.csv")
-            print("***done! Check the program's directory!***")
-            break
 
-def freq(comments_to_count):
-    list_to_string = ' '.join([str(elem) for elem in comments_to_count])
-    print(list_to_string)
+#--- Shared Functions ---#
+def reddit_to_csv(url, pages):
+    # url = input('\nWhat is the URL of the Reddit thread?: ')
+    submission = reddit.submission(url=url)
+
+    # CSV Storage
+    for item in url:
+        comments_dict = {
+            "comment_id": [],  # unique comm id
+            "comment_parent_id": [],  # comment parent id
+            "comment_body": [],  # text in comment
+            "comment_link_id": []  # link to the comment
+        }
+
+        # pages = input(f"\nLet's set a limit on pages to scrape..."
+        #               f'\nHow many pages should the program scrape before stopping? (Type "None" if you want every page)'
+        #               f"\n>>: ")
+        if pages.isnumeric():
+            pages = int(pages)
+
+        else:
+            pages = None
+
+        submission.comments.replace_more(limit=pages)
+        for comment in submission.comments.list():
+            comments_dict["comment_id"].append(comment.id)
+            comments_dict["comment_parent_id"].append(comment.parent_id)
+            comments_dict["comment_body"].append(comment.body)
+            comments_dict["comment_link_id"].append(comment.link_id)
+
+        post_comments = pd.DataFrame(comments_dict)
+        post_comments.to_csv("RESULTS_Comments_from_URL.csv")
+
+        # Word Counter
+        allcommentslist = (comments_dict.get('comment_body'))
+        allcomments = word_counter(allcommentslist)  # Uses created word counter function
+        allcomments.to_csv("WORD_Count_RESULTS_from_URL.csv")
+        return
+
+def word_counter(allcommentslist): #Next task is to add stopwords
+    allcommentsstr = ''.join(allcommentslist)
+    allcomments_split = allcommentsstr.split()
+
+    filtered_sentence = stopwordmachine(allcomments_split)
+    filtered_sentence_split = filtered_sentence.split()
+
+    allcomments_count = collections.Counter(filtered_sentence_split)
+    allcomments_count_sorted = allcomments_count.most_common()
+    allcomments = pd.DataFrame(allcomments_count_sorted)
+    return allcomments
+
+def stopwordmachine(allcomments_split):
+    all_stopwords = stopwords.words('english')
+    all_stopwords.append("’")
+    all_stopwords.append('“')
+    all_stopwords.append('”')
+
+    allcomments_split = str(allcomments_split)
+    allcomments_split = allcomments_split.lower()
+    allcomments_split_nopunc = allcomments_split.translate(str.maketrans('', '', string.punctuation))
+    text_tokens = word_tokenize(allcomments_split_nopunc)
+    tokens_without_sw = [word for word in text_tokens if not word in all_stopwords]
+    filtered_sentence = (" ").join(tokens_without_sw)
+    return(filtered_sentence)
 
 # --- Main Function --- #
 if __name__ == '__main__':
