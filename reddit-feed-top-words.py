@@ -6,6 +6,7 @@ import time
 from csv import reader
 from itertools import islice
 
+
 #--- Pre-Reqs ---#
 #panda
 import pandas as pd
@@ -87,11 +88,12 @@ def url_streaming(url, pages):
             with open('WORD_Count_RESULTS_from_URL.csv', 'r', encoding="utf8") as read_obj:
                 csv_reader = reader(read_obj)
                 for row in islice(csv_reader, 1, 51):
-                    print(f'Rank: {row[0]}      Word: {row[1]} : {row[2]}')
-                    time.sleep(1)
+                        print(f'Rank: {row[0]} - {row[1]} : {row[2]}')
+                        time.sleep(1)
             print('*** Recalculating... ***')
         except KeyboardInterrupt:
-            break
+            read_obj.close()
+            return
 
 #--- Search Term Function ---#
 def query_method():
